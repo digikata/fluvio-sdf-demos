@@ -49,12 +49,13 @@ services:
       context: ./data-generator/fluvio-client
     network_mode: host
     entrypoint: >
-      /bin/sh -c "
+      /bin/sh -c -e "
         fluvio profile add docker 127.0.0.1:9103 docker &&
-        fluvio topic create player-events &&
-        fluvio topic create purchase-events &&
-        fluvio topic create player-positions &&
-        fluvio topic create server-metrics &&
+        fluvio topic create player-events --retention-time=1h --segment-size=1M &&
+        fluvio topic create purchase-events --retention-time=1h --segment-size=1M &&
+        fluvio topic create player-positions --retention-time=1h --segment-size=1M &&
+        fluvio topic create server-metrics --retention-time=1h --segment-size=1M &&
+        fluvio topic create gs-funnel --retention-time=1h --segment-size=1M &&
         exit 0;
       "
     depends_on:
@@ -68,6 +69,16 @@ services:
       - cluster-setup
     environment:
       FLUVIO_TOPIC: player-events
+
+  data-generator-gs-funnel:
+    build:
+      context: ./data-generator/gs-funnel
+      dockerfile: ../fluvio-client/dockerfile
+    network_mode: host
+    depends_on:
+      - cluster-setup
+    environment:
+      FLUVIO_TOPIC: gs-funnel
     # command: sh -c "/app/run-retry.sh"
 
   # data-generator-web-api:
