@@ -99,6 +99,95 @@ types:
       total_amount:
         type: f64
 
+  gs-event:
+    type: enum
+    oneOf:
+      player-death:
+        type: player-death
+      player-login:
+        type: player-login
+      player-start-game:
+        type: player-start-game
+      player-progression:
+        type: player-progression
+
+  player-death:
+    type: object
+    properties:
+      event_name:
+        type: string
+      player_id:
+        type: string
+      timestamp:
+        type: string
+      map:
+        type: string
+      level:
+        type: string
+      success:
+        type: string
+      difficulty:
+        type: string
+
+  player-progression:
+    type: object
+    properties:
+      event_name:
+        type: string
+      player_id:
+        type: string
+      timestamp:
+        type: string
+      map:
+        type: string
+      current_level:
+        type: string
+      new_level:
+        type: string
+      success:
+        type: bool
+      difficulty:
+        type: string
+
+  player-start-game:
+    type: object
+    properties:
+      event_name:
+        type: string
+      player_id:
+        type: string
+      timestamp:
+        type: string
+      map:
+        type: string
+      current_level:
+        type: string
+      level:
+        type: u32
+
+  player-login:
+    type: object
+    properties:
+      event_name:
+        type: string
+      player_id:
+        type: string
+      timestamp:
+        type: string
+
+  map-level-death-count:
+    type: object
+    properties:
+      map_level:
+        type: string
+      deaths:
+        type: u32
+
+  gs-prog-summary:
+    type: list
+    items:
+      type: map-level-death-count
+
 topics:
   player-events:
     schema:
@@ -119,6 +208,16 @@ topics:
     schema:
       value:
         type: item-purchase-list
+
+  gs-funnel:
+    schema:
+      value:
+        type: gs-event
+
+  gs-progress-summary:
+    schema:
+      value:
+        type: gs-prog-summary
 
 services:
   # Monitor player sessions
@@ -164,7 +263,7 @@ services:
             fn increment_event_count(_event: PlayerEvent) -> Result<()> {
               let mut state = events_per_user();
               state.count += 1;
-              state.update();
+              state.update()?;
               Ok(())
             }
 
@@ -255,3 +354,77 @@ services:
     sinks:
       - type: topic
         id: purchase-summaries
+
+# generate windowed deaths per level
+  gs-progress-summary:
+    sources:
+      - type: topic
+        id: gs-funnel
+
+    states:
+      map-level-death-count:
+        type: keyed-state
+        properties:
+          key:
+            type: string
+          value:
+            type: arrow-row
+            properties:
+              count:
+                type: u32
+
+    transforms:
+      - operator: filter
+        run: |
+          fn filter_death_events(event: GsEvent) -> Result<bool> {
+            let is_death_event = match event {
+              GsEvent::PlayerDeath(_) => true,
+              _ => false,
+            };
+            Ok(is_death_event)
+          }
+
+    window:
+      tumbling:
+        duration: 2m
+
+      assign-timestamp:
+        # Instruct the engine to apply the timestamp from the event metadata for the watermark operator
+        run: |
+          fn assign_gs_event_timestamp(_value: GsEvent, event_time: i64) -> Result<i64> {
+            Ok(event_time)
+          }
+
+      partition:
+        # Assign a partition key to divide the data set for the update operation
+        assign-key:
+          run: |
+            fn assign_gs_event_key(event: GsEvent) -> Result<String> {
+              let key = match event {
+                GsEvent::PlayerDeath(event) => format!("{}-{}", event.map, event.level),
+                _ => "other-message".to_string(),
+              };
+              Ok(key)
+            }
+
+        update-state:
+          run: |
+            fn gs_progress_update_state(_event: GsEvent) -> Result<()> {
+              map_level_death_count().increment(1);
+              Ok(())
+            }
+
+      flush:
+        # Read the full state and compute the top 3 words sorted by count.
+        run: |
+          fn gs_progress_flush() -> Result<GsProgSummary> {
+            let state = map_level_death_count();
+            let summary = state.into_iter().map(|(key, value)| {
+              MapLevelDeathCount { map_level: key, deaths: value.count }
+            }).collect();
+            Ok(summary)
+          }
+
+    sinks:
+      - type: topic
+        id: gs-progress-summary

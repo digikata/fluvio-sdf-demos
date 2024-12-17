@@ -270,7 +270,7 @@ class GameEventSimulator:
                     'event_type': 'player_progression',
                     'player_id': player.player_id,
                     'map': player.current_map,
-                    'current_level': player.current_level,
+                    'level': player.current_level,
                     'success': progression['success'],
                     'difficulty': progression['difficulty'],
                     'timestamp': self.current_time_step

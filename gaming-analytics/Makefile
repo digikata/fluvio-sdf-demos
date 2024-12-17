@@ -1,4 +1,10 @@
 
+default:
+	@echo "make start   - build and start the demo w/ docker compose"
+	@echo "make stop    - stop the docker compose"
+	@echo "make fresh-start - rebuild the dc images and start"
+	@echo "make install - install the fluvio & sdf cli utilities"
+	@echo "make studio  - show the local sdf studio UI"
 
 # start the demo w/ docker compose
 # docker compose restart data-generator-fluvio-client seems to sometimes be needed
@@ -18,7 +24,7 @@ fresh-start:
 
 # Install sdf-beta3 locally as a client
 install:
-	UN curl -fsS "https://hub.infinyon.cloud/install/install.sh?ctx=ga-sdf-demo" | FLUVIO_VERSION=sdf-beta3 bash
+	curl -fsS "https://hub.infinyon.cloud/install/install.sh?ctx=ga-sdf-demo" | FLUVIO_VERSION=sdf-beta3 bash
 
 # show graphical UI of the dataflow
 studio:

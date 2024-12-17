@@ -12,3 +12,10 @@ smoke:
     #!/bin/sh
     source venv/bin/activate
     PY_LOG=debug python main.py
+
+# debug run the script
+debug:
+    #!/bin/sh
+    source venv/bin/activate
+    . ./run-retry.sh
+
