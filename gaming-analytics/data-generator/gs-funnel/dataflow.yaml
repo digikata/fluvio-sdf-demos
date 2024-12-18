@@ -1,0 +1,202 @@
+apiVersion: 0.5.0
+meta:
+  name: gaming-analytics
+  version: 0.1.0
+  namespace: examples
+config:
+  converter: json
+  consumer:
+    default_starting_offset:
+      value: 0
+      position: End
+
+types:
+  gs-event:
+    type: enum
+    oneOf:
+      player-death:
+        type: player-death
+      player-login:
+        type: player-login
+      player-start-game:
+        type: player-start-game
+      player-progression:
+        type: player-progression
+
+  player-death:
+    type: object
+    properties:
+      event_name:
+        type: string
+      player_id:
+        type: string
+      timestamp:
+        type: string
+      map:
+        type: string
+      level:
+        type: string
+      success:
+        type: string
+      difficulty:
+        type: string
+
+  player-progression:
+    type: object
+    properties:
+      event_name:
+        type: string
+      player_id:
+        type: string
+      timestamp:
+        type: string
+      map:
+        type: string
+      level:
+        type: string
+      new_level:
+        type: string
+      success:
+        type: bool
+      difficulty:
+        type: string
+
+  player-start-game:
+    type: object
+    properties:
+      event_name:
+        type: string
+      player_id:
+        type: string
+      timestamp:
+        type: string
+      map:
+        type: string
+      current_level:
+        type: string
+      level:
+        type: u32
+
+  player-login:
+    type: object
+    properties:
+      event_name:
+        type: string
+      player_id:
+        type: string
+      timestamp:
+        type: string
+
+  map-level-prog:
+    type: object
+    properties:
+      map_level:
+        type: string
+      deaths:
+        type: u32
+
+  gs-prog-summary:
+    type: list
+    items:
+      type: map-level-prog
+
+topics:
+  gs-funnel:
+    schema:
+      value:
+        type: gs-event
+
+  gs-progress-summary:
+    schema:
+      value:
+        type: gs-prog-summary
+
+services:
+  # generate windowed deaths per level
+  gs-progress-summary:
+    sources:
+      - type: topic
+        id: gs-funnel
+
+    states:
+      map-level-death-count:
+        type: keyed-state
+        properties:
+          key:
+            type: string
+          value:
+            type: arrow-row
+            properties:
+              count:
+                type: u32
+
+    # transforms:
+    #   - operator: filter
+    #     run: |
+    #       fn filter_death_events(event: GsEvent) -> Result<bool> {
+    #         let is_death_event = match event {
+    #           GsEvent::PlayerDeath(_) => true,
+    #           _ => false,
+    #         };
+    #         Ok(is_death_event)
+    #       }
+
+    window:
+      tumbling:
+        duration: 2m
+
+      assign-timestamp:
+        # Instruct the engine to apply the timestamp from the event metadata for the watermark operator
+        run: |
+          fn assign_gs_event_timestamp(_value: GsEvent, event_time: i64) -> Result<i64> {
+            Ok(event_time)
+          }
+
+      partition:
+        # Assign a partition key to divide the data set for the update operation
+        assign-key:
+          run: |
+            fn assign_gs_event_key(event: GsEvent) -> Result<String> {
+              let key = match event {
+                GsEvent::PlayerDeath(event) => format!("{}-{}", event.map, event.level),
+                _ => "other-message".to_string(),
+              };
+              Ok(key)
+            }
+
+        update-state:
+          run: |
+            fn gs_progress_update_state(_event: GsEvent) -> Result<()> {
+              let mut state = map_level_death_count();
+              state.count += 1;
+              let _ = state.update();
+              Ok(())
+            }
+
+      flush:
+        # Read the full state and compute the top 3 words sorted by count.
+        run: |
+          fn gs_progress_flush() -> Result<GsProgSummary> {
+            let mapdat = map_level_death_count().clone();
+            let mut summary = vec![];
+            let key = mapdat.key()?;
+            let col_count = mapdat.col("count")?;
+
+            let rows = mapdat.rows()?;
+            loop {
+              let map_level = rows.str(&key)?;
+              let deaths = rows.u32(&col_count)?;
+              summary.push(MapLevelProg {
+                map_level,
+                deaths,
+              });
+              if !rows.next() {
+                break;
+              }
+            }
+            Ok(summary)
+          }
+
+    sinks:
+      - type: topic
+        id: gs-progress-summary
