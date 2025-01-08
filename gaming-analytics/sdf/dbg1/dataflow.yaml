@@ -1,0 +1,82 @@
+apiVersion: 0.5.0
+meta:
+  name: ga-dbg1
+  version: 0.1.0
+  namespace: examples
+
+config:
+  converter: json
+  consumer:
+    default_starting_offset:
+      value: 0
+      position: End
+
+types:
+  player-activity:
+    type: object
+    properties:
+      event_type:
+        type: string
+      player_id:
+        type: string
+      timestamp:
+        type: u64
+      map:
+        type: string
+      level:
+        type: u32
+      success:
+        type: bool
+      difficulty:
+        type: f32
+
+  map-level-prog:
+    type: object
+    properties:
+      map_level:
+        type: string
+      deaths:
+        type: u32
+      reached:
+        type: u32
+
+  progress-summary:
+    type: list
+    items:
+      type: map-level-prog
+
+topics:
+  gs-funnel:
+    name: gs-funnel
+    schema:
+      value:
+        type: string
+        converter: raw
+
+  player-activity:
+    name: player-activity
+    schema:
+      value:
+        type: player-activity
+
+services:
+  # generate windowed deaths per level
+  dbg-parse:
+    sources:
+      - type: topic
+        id: gs-funnel
+
+    transforms:
+      - operator: filter-map
+        dependencies:
+          - name: serde_json
+            version: "1.0.60"
+        run: |
+          fn parse_event(evt_string: String) -> Result<Option<PlayerActivity>> {
+            let event = serde_json::from_str(&evt_string);
+            Ok(event.ok())
+          }
+
+    sinks:
+      - type: topic
+        id: player-activity
