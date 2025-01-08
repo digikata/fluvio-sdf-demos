@@ -1,6 +1,7 @@
 FROM rust:1-slim-bookworm
 
 RUN rustup target add wasm32-wasip1
+RUN rustup target add wasm32-wasip2
 RUN apt-get update
 RUN apt-get install -y curl unzip
 RUN apt-get install -y tini openssl curl

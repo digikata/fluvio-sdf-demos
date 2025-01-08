@@ -11,81 +11,23 @@ config:
       position: End
 
 types:
-  gs-event:
-    type: enum
-    oneOf:
-      player-death:
-        type: player-death
-      player-login:
-        type: player-login
-      player-start-game:
-        type: player-start-game
-      player-progression:
-        type: player-progression
-
-  player-death:
+  player-activity:
     type: object
     properties:
-      event_name:
+      event_type:
         type: string
       player_id:
         type: string
       timestamp:
-        type: string
+        type: u64
       map:
-        type: string
-      level:
-        type: string
-      success:
-        type: string
-      difficulty:
-        type: string
-
-  player-progression:
-    type: object
-    properties:
-      event_name:
-        type: string
-      player_id:
-        type: string
-      timestamp:
-        type: string
-      map:
-        type: string
-      level:
-        type: string
-      new_level:
-        type: string
-      success:
-        type: bool
-      difficulty:
-        type: string
-
-  player-start-game:
-    type: object
-    properties:
-      event_name:
-        type: string
-      player_id:
-        type: string
-      timestamp:
-        type: string
-      map:
-        type: string
-      current_level:
         type: string
       level:
         type: u32
-
-  player-login:
-    type: object
-    properties:
-      event_name:
-        type: string
-      player_id:
-        type: string
-      timestamp:
-        type: string
+      success:
+        type: bool
+      difficulty:
+        type: f32
 
   map-level-prog:
     type: object
@@ -104,7 +46,7 @@ topics:
   gs-funnel:
     schema:
       value:
-        type: gs-event
+        type: player-activity
 
   gs-progress-summary:
     schema:
@@ -127,7 +69,9 @@ services:
           value:
             type: arrow-row
             properties:
-              count:
+              deaths:
+                type: u32
+              reached:
                 type: u32
 
     # transforms:
@@ -148,7 +92,7 @@ services:
       assign-timestamp:
         # Instruct the engine to apply the timestamp from the event metadata for the watermark operator
         run: |
-          fn assign_gs_event_timestamp(_value: GsEvent, event_time: i64) -> Result<i64> {
+          fn assign_gs_event_timestamp(_value: PlayerActivity, event_time: i64) -> Result<i64> {
             Ok(event_time)
           }
 
@@ -156,9 +100,10 @@ services:
         # Assign a partition key to divide the data set for the update operation
         assign-key:
           run: |
-            fn assign_gs_event_key(event: GsEvent) -> Result<String> {
-              let key = match event {
-                GsEvent::PlayerDeath(event) => format!("{}-{}", event.map, event.level),
+            fn assign_gs_event_key(event: PlayerActivity) -> Result<String> {
+              let key = match event.event_type.as_str() {
+                "player_death" => format!("{}-{}", event.map, event.level),
+                "player_progression" => format!("{}-{}", event.map, event.level),
                 _ => "other-message".to_string(),
               };
               Ok(key)
@@ -166,10 +111,14 @@ services:
 
         update-state:
           run: |
-            fn gs_progress_update_state(_event: GsEvent) -> Result<()> {
+            fn gs_progress_update_state(event: PlayerActivity) -> Result<()> {
               let mut state = map_level_death_count();
-              state.count += 1;
-              let _ = state.update();
+              match event.event_type.as_str() {
+                "player_death" => state.deaths += 1,
+                "player_progression" => state.reached += 1,
+                _ => state.reached += 1,
+              };
+              state.update()?;
               Ok(())
             }
 
@@ -180,12 +129,12 @@ services:
             let mapdat = map_level_death_count().clone();
             let mut summary = vec![];
             let key = mapdat.key()?;
-            let col_count = mapdat.col("count")?;
+            let col_deaths = mapdat.col("deaths")?;
 
             let rows = mapdat.rows()?;
             loop {
               let map_level = rows.str(&key)?;
-              let deaths = rows.u32(&col_count)?;
+              let deaths = rows.u32(&col_deaths)?;
               summary.push(MapLevelProg {
                 map_level,
                 deaths,

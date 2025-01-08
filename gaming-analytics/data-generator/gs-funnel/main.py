@@ -247,13 +247,13 @@ class GameEventSimulator:
                 )[0]]
 
                 server.state = new_state
-                step_events.append({
-                    'event_type': 'server_state_change',
-                    'server_id': server.server_id,
-                    'old_state': old_state.name,
-                    'new_state': new_state.name,
-                    'timestamp': self.current_time_step
-                })
+                # step_events.append({
+                #     'event_type': 'server_state_change',
+                #     'server_id': server.server_id,
+                #     'old_state': old_state.name,
+                #     'new_state': new_state.name,
+                #     'timestamp': self.current_time_step
+                # })
 
         event_count = self._generate_event_count()
         logging.debug(f"Drawing player {event_count} events for time step {self.current_time_step} out of {len(self.players)} players")
@@ -278,7 +278,7 @@ class GameEventSimulator:
 
                 if progression['success'] and player.current_level < len(current_map_levels):
                     player.current_level += 1
-                    event['new_level'] = player.current_level
+                    event['level'] = player.current_level
                 else:
                     player.state = PlayerState.OFFLINE
                     player.deaths += 1
@@ -298,11 +298,11 @@ class GameEventSimulator:
 
                 if player.cooldown <= 0:
                     player.state = PlayerState.LOGGED_IN
-                    step_events.append({
-                        'event_type': 'player_login',
-                        'player_id': player.player_id,
-                        'timestamp': self.current_time_step
-                    })
+                    # step_events.append({
+                    #     'event_type': 'player_login',
+                    #     'player_id': player.player_id,
+                    #     'timestamp': self.current_time_step
+                    # })
 
             if player.state == PlayerState.LOGGED_IN:
                 # Player is logged in, move to in-game state
@@ -314,14 +314,13 @@ class GameEventSimulator:
                 server = random.choice(self.servers)
                 self._server_add_player(server, player)
 
-                step_events.append({
-                    'event_type': 'player_start_game',
-                    'player_id': player.player_id,
-                    'map': player.current_map,
-                    'level': player.current_level,
-                    'timestamp': self.current_time_step
-                })
-
+                # step_events.append({
+                #     'event_type': 'player_start_game',
+                #     'player_id': player.player_id,
+                #     'map': player.current_map,
+                #     'level': player.current_level,
+                #     'timestamp': self.current_time_step
+                # })
 
         self.event_log.extend(step_events)
         return step_events

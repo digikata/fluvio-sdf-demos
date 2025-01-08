@@ -101,24 +101,24 @@ services:
   #     HTTP_ENDPOINT: http://data-generator-web-api:8000/player_event
   #     GRAPHITE_ENDPOINT: http://graphite:2003
 
-  sdf:
-    build:
-      context: ./sdf
-    depends_on:
-      - cluster-setup
-    network_mode: host
-    environment:
-      SDF_CONFIG: /sdf/sdf_config.yaml
-    command: >
-      sh -c "
-        while true; do \
-          echo \"Adding fluvio profile\"; \
-          fluvio profile add docker 127.0.0.1:9103 docker; \
-          fluvio profile list; \
-          bash run.sh; \
-          sleep 10; \
-        done
-      "
+  # sdf-worker:
+  #   build:
+  #     context: ./sdf
+  #   depends_on:
+  #     - cluster-setup
+  #   network_mode: host
+  #   environment:
+  #     SDF_CONFIG: /sdf/sdf_config.yaml
+  #   command: >
+  #     sh -c "
+  #       while true; do \
+  #         echo \"Adding fluvio profile\"; \
+  #         fluvio profile add docker 127.0.0.1:9103 docker; \
+  #         fluvio profile list; \
+  #         bash run.sh; \
+  #         sleep 10; \
+  #       done
+  #     "
 
   viz2:
     build:

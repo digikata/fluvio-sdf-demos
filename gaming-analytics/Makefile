@@ -22,9 +22,9 @@ stop:
 fresh-start:
 	docker compose up --build --detach
 
-# Install sdf-beta3 locally as a client
+# Install sdf-beta5 locally as a client
 install:
-	curl -fsS "https://hub.infinyon.cloud/install/install.sh?ctx=ga-sdf-demo" | FLUVIO_VERSION=sdf-beta3 bash
+	curl -fsS "https://hub.infinyon.cloud/install/install.sh?ctx=ga-sdf-demo" | FLUVIO_VERSION=sdf-beta5 bash
 
 # show graphical UI of the dataflow
 studio:

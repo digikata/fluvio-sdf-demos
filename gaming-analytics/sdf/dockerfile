@@ -18,9 +18,10 @@ RUN apt-get update && \
 #     rustup install 1.80.0 && \
 #     rustup default 1.80.0
 RUN rustup target add wasm32-wasip1
+RUN rustup target add wasm32-wasip2
 
 # installs Fluvio with sdf
-RUN curl -fsS "https://hub.infinyon.cloud/install/install.sh?ctx=ga-sdf-demo" | FLUVIO_VERSION=sdf-beta3 bash
+RUN curl -fsS "https://hub.infinyon.cloud/install/install.sh?ctx=ga-sdf-demo" | FLUVIO_VERSION=sdf-beta5 bash
 ENV PATH "$PATH:/root/.fluvio/bin"
 ENV PATH "$PATH:/root/.fvm/bin"
 
