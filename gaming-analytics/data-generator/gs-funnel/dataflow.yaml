@@ -3,6 +3,7 @@ meta:
   name: gaming-analytics
   version: 0.1.0
   namespace: examples
+
 config:
   converter: json
   consumer:
@@ -36,22 +37,27 @@ types:
         type: string
       deaths:
         type: u32
+      reached:
+        type: u32
 
-  gs-prog-summary:
+  progress-summary:
     type: list
     items:
       type: map-level-prog
 
 topics:
   gs-funnel:
+    name: gs-funnel
     schema:
       value:
-        type: player-activity
+        type: string
+        converter: raw
 
-  gs-progress-summary:
+  progress-summary:
+    name: progress-summary
     schema:
       value:
-        type: gs-prog-summary
+        type: progress-summary
 
 services:
   # generate windowed deaths per level
@@ -74,27 +80,38 @@ services:
               reached:
                 type: u32
 
-    # transforms:
-    #   - operator: filter
-    #     run: |
-    #       fn filter_death_events(event: GsEvent) -> Result<bool> {
-    #         let is_death_event = match event {
-    #           GsEvent::PlayerDeath(_) => true,
-    #           _ => false,
-    #         };
-    #         Ok(is_death_event)
-    #       }
+    transforms:
+      - operator: filter-map
+        dependencies:
+          - name: serde_json
+            version: "1.0.60"
+        run: |
+          fn parse_event(evt_string: String) -> Result<Option<PlayerActivity>> {
+            let event = serde_json::from_str(&evt_string);
+            Ok(event.ok())
+          }
 
     window:
       tumbling:
-        duration: 2m
+        duration: 180s
 
       assign-timestamp:
+        dependencies:
+          - name: chrono
+            version: "0.4.23"
         # Instruct the engine to apply the timestamp from the event metadata for the watermark operator
         run: |
-          fn assign_gs_event_timestamp(_value: PlayerActivity, event_time: i64) -> Result<i64> {
-            Ok(event_time)
+          fn assign_timestamp(_evt: PlayerActivity, _event_time: i64) -> Result<i64> {
+            use chrono::Utc;
+            fn now_utc() -> anyhow::Result<i64> {
+              let time = Utc::now();
+              Ok(time.timestamp_millis())
+            }
+            now_utc()
           }
+          // fn assign_gs_event_timestamp(_value: PlayerActivity, event_time: i64) -> Result<i64> {
+          //   Ok(event_time)
+          // }
 
       partition:
         # Assign a partition key to divide the data set for the update operation
@@ -111,7 +128,7 @@ services:
 
         update-state:
           run: |
-            fn gs_progress_update_state(event: PlayerActivity) -> Result<()> {
+            fn progress_update_state(event: PlayerActivity) -> Result<()> {
               let mut state = map_level_death_count();
               match event.event_type.as_str() {
                 "player_death" => state.deaths += 1,
@@ -125,27 +142,28 @@ services:
       flush:
         # Read the full state and compute the top 3 words sorted by count.
         run: |
-          fn gs_progress_flush() -> Result<GsProgSummary> {
-            let mapdat = map_level_death_count().clone();
+          fn progress_flush() -> Result<ProgressSummary> {
+            let mapdat = map_level_death_count();
             let mut summary = vec![];
+
             let key = mapdat.key()?;
             let col_deaths = mapdat.col("deaths")?;
+            let col_reached = mapdat.col("reached")?;
 
             let rows = mapdat.rows()?;
-            loop {
+            while rows.next() {
               let map_level = rows.str(&key)?;
               let deaths = rows.u32(&col_deaths)?;
+              let reached = rows.u32(&col_reached)?;
               summary.push(MapLevelProg {
                 map_level,
                 deaths,
+                reached,
               });
-              if !rows.next() {
-                break;
-              }
             }
             Ok(summary)
           }
 
     sinks:
       - type: topic
-        id: gs-progress-summary
+        id: progress-summary
