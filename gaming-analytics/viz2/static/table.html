@@ -39,7 +39,7 @@
         // Handle WebSocket message
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data);
-            const top20Data = sortAndFilterTopN(data, 'event_count', 20);
+            const top20Data = sortAndFilterTopN(data, 'event_count', 10);
             document.querySelector("#livedata").innerHTML = formatTable(top20Data);
         };
     </script>

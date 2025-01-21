@@ -1,0 +1,35 @@
+html, body {
+    height: 100%;
+    margin: 0;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+header, footer {
+    flex-shrink: 0;
+}
+
+main {
+    flex: 1;
+    min-height: 0; /* Important for Firefox */
+}
+
+.graph-container {
+    display: flex;
+    height: 80%;
+}
+
+.graph-container .v-table {
+    width: 300px;
+    height: 100%;
+    border: none;
+}
+
+.graph-container .v-purchase {
+    flex-grow: 1;
+    height: 100%;
+    border: none;
+}

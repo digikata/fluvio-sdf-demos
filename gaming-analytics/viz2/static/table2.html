@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Table: Player Session Summaries</title>
+    <link rel="stylesheet" href="https://cdn.datatables.net/2.1.8/css/dataTables.dataTables.css" />
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.datatables.net/2.1.8/js/dataTables.js"></script>
+</head>
+<body>
+    <h1>Player Session Summaries</h1>
+    <div id="liveData" style="width: 600px; height: 400px;">
+        <table class="my Table"></table>
+    </div>
+
+    <script>
+        // Connect to WebSocket
+        const ws = new WebSocket("ws://127.0.0.1:3001/ws/player-session-summaries");
+
+        // table format function
+        let table_options = {
+            scrollY: 300,
+            paging: false
+        };
+        let table = new DataTable('#myTable', table_options);
+
+        // Handle WebSocket message
+        ws.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+            const top20Data = sortAndFilterTopN(data, 'event_count', 20);
+            document.querySelector("#livedata").innerHTML = formatTable(top20Data);
+        };
+    </script>
+</body>
+</html>

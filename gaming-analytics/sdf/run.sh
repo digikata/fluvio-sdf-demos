@@ -10,6 +10,9 @@ sdf clean
 
 echo Starting Worker
 sdf worker create compose-service --worker-id compose-service
+sdf worker register dc compose-service
+
+sdf deploy &
 
 echo Starting SDF Deploy
 sdf deploy --ui

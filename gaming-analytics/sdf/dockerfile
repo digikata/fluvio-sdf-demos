@@ -1,9 +1,8 @@
 FROM rust:1-slim-bookworm
 WORKDIR /workspace
 # COPY connectors/*.yaml connectors/
-COPY gs-funnel/dataflow.yaml .
+COPY dataflow.yaml .
 COPY run.sh .
-
 
 RUN apt-get update && \
     apt-get install -y \

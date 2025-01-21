@@ -175,7 +175,7 @@ types:
       timestamp:
         type: string
 
-  map-level-death-count:
+  map-level-dc:
     type: object
     properties:
       map_level:
@@ -186,7 +186,7 @@ types:
   gs-prog-summary:
     type: list
     items:
-      type: map-level-death-count
+      type: map-level-dc
 
 topics:
   player-events:
@@ -263,8 +263,7 @@ services:
             fn increment_event_count(_event: PlayerEvent) -> Result<()> {
               let mut state = events_per_user();
               state.count += 1;
-              state.update()?;
-              Ok(())
+              state.update()
             }
 
       flush:
@@ -329,8 +328,7 @@ services:
             fn update_purchase_amount(event: PurchaseEvent) -> Result<()> {
               let mut state = purchase_per_item();
               state.total_amount += event.parameters.amount;
-              state.update();
-              Ok(())
+              state.update()
             }
 
       flush:
@@ -362,7 +360,7 @@ services:
         id: gs-funnel
 
     states:
-      map-level-death-count:
+      map-level-stats:
         type: keyed-state
         properties:
           key:
@@ -386,7 +384,7 @@ services:
 
     window:
       tumbling:
-        duration: 2m
+        duration: 25s
 
       assign-timestamp:
         # Instruct the engine to apply the timestamp from the event metadata for the watermark operator
@@ -410,18 +408,25 @@ services:
         update-state:
           run: |
             fn gs_progress_update_state(_event: GsEvent) -> Result<()> {
-              map_level_death_count().increment(1);
-              Ok(())
+              let mut state = map_level_stats();
+              state.count += 1;
+              state.update()
             }
 
       flush:
         # Read the full state and compute the top 3 words sorted by count.
         run: |
           fn gs_progress_flush() -> Result<GsProgSummary> {
-            let state = map_level_death_count();
-            let summary = state.into_iter().map(|(key, value)| {
-              MapLevelDeathCount { map_level: key, deaths: value.count }
-            }).collect();
+            let state = map_level_stats();
+            let mut summary = Vec::new();
+            let rows = state.rows()?;
+            let key_col = state.key()?;
+            let dth_col = state.col("deaths")?;
+            while rows.next() {
+              let key = rows.str(&key_col)?;
+              let deaths = rows.u32(&dth_col)?;
+              summary.push(MapLevelDc { map_level: key, deaths });
+            }
             Ok(summary)
           }
 

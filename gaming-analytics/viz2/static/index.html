@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gaming Analytics</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="stat/styles.css">
 </head>
 <body>
     <header>
@@ -15,16 +15,14 @@
             <h2>Overview</h2>
             <p>Welcome to the Gaming Analytics Dashboard. Here you can find insights and data visualizations about gaming trends.</p>
         </section>
-        <section id="pages">
-            <ul>
-                <li><a href="stat/table.html">View Table</a></li>
-                <li><a href="stat/purchase.html">Item Purchases</a></li>
-            </ul>
+        <section class="graph-container" id="pages">
+            <iframe class="v-table" src="stat/table.html">Table</iframe>
+            <iframe class="v-purchase" src="stat/purchase.html">Item Purchases</iframe>
         </section>
     </main>
     <footer>
         <p><a href="https://www.infinyon.com">Infinyon</a></p>
     </footer>
-    <script src="scripts.js"></script>
+    <!-- <script src="scripts.js"></script> -->
 </body>
 </html>
