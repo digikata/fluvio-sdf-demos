@@ -384,7 +384,7 @@ services:
 
     window:
       tumbling:
-        duration: 25s
+        duration: 5s
 
       assign-timestamp:
         # Instruct the engine to apply the timestamp from the event metadata for the watermark operator
